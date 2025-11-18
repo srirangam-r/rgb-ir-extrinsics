@@ -1,0 +1,3 @@
+[2025/11/17 21:25:29 hloc INFO] Loading matchanything_roma model done
+[2025/11/17 21:25:31 hloc INFO] ransac_method: CV2_USAC_MAGSAC, geometry_type: Fundamental
+[2025/11/17 21:25:31 hloc INFO] ransac_method: CV2_USAC_MAGSAC, geometry_type: Homography

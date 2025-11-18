@@ -1,0 +1,3 @@
+[submodule "MatchAnything"]
+	path = MatchAnything
+	url = https://huggingface.co/spaces/LittleFrog/MatchAnything
