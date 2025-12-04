@@ -1,0 +1,21 @@
+bag_file: "/home/nail/stuff/rgb-ir/frluas3_2025-11-13-17-19-34.bag"
+output_dir: "/home/nail/stuff/rgb-ir/frames_synced"
+sync: true
+time_tol: 0.01
+start_index: 50
+end_index: 300
+topics:
+  /frluas3/boson_camera_array/cam_0/image_raw:
+    to_8bit: true
+    norm: false
+    clahe: true
+  /frluas3/camera_array/cam0/image_raw:
+    grayscale: false
+    clahe: false
+  /frluas3/boson_camera_array/cam_1/image_raw:
+    to_8bit: true
+    norm: false
+    clahe: true
+  /frluas3/camera_array/cam1/image_raw:
+    grayscale: false
+    clahe: false
