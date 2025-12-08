@@ -256,3 +256,62 @@ def plot_point_cloud(pts3d, color_input=None, min_z=0.1, max_z=10.0, subsample=5
         margin=dict(l=0, r=0, b=0, t=40)
     )
     fig.show()
+
+def visualize_pnp_reprojection(img_path, object_points, image_points, rvec, tvec, K, D, inliers=None):
+    """
+    Visualizes the quality of the PnP solution.
+    """
+    # 1. Load Image
+    if isinstance(img_path, str):
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"Error: Could not load {img_path}")
+            return
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    else:
+        img = img_path.copy()
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
+    # 2. Filter Inliers (if provided)
+    if inliers is not None:
+        inliers = inliers.flatten()
+        obj_pts = object_points[inliers]
+        img_pts = image_points[inliers]
+    else:
+        obj_pts = object_points
+        img_pts = image_points
+
+    # 3. Project 3D points to 2D
+    projected_points, _ = cv2.projectPoints(obj_pts, rvec, tvec, K, D)
+    projected_points = projected_points.squeeze()
+
+    # 4. Draw
+    # Create a high-res canvas for cleaner drawing if needed, but drawing on img is fine
+    canvas = img.copy()
+    
+    # Calculate errors for title
+    errors = np.linalg.norm(img_pts - projected_points, axis=1)
+    mean_err = np.mean(errors)
+    
+    print(f"Visualizing {len(obj_pts)} inliers.")
+    print(f"Mean Reprojection Error: {mean_err:.4f} pixels")
+
+    for i, (pt_true, pt_pred) in enumerate(zip(img_pts, projected_points)):
+        # True Point (Green Circle)
+        cv2.circle(canvas, (int(pt_true[0]), int(pt_true[1])), 4, (0, 255, 0), 1)
+        
+        # Projected Point (Red Cross)
+        cv2.drawMarker(canvas, (int(pt_pred[0]), int(pt_pred[1])), (255, 0, 0), 
+                       markerType=cv2.MARKER_CROSS, markerSize=8, thickness=1)
+        
+        # Error Line (Yellow)
+        cv2.line(canvas, (int(pt_true[0]), int(pt_true[1])), 
+                 (int(pt_pred[0]), int(pt_pred[1])), (255, 255, 0), 1)
+
+    # 5. Plot
+    plt.figure(figsize=(12, 8))
+    plt.imshow(canvas)
+    plt.title(f"PnP Reprojection (Mean Error: {mean_err:.2f} px)\nGreen=Observed, Red=Projected")
+    plt.axis('off')
+    plt.show()
