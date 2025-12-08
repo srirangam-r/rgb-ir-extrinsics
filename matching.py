@@ -43,41 +43,56 @@ def limit_inliers(pred, max_inliers=800):
 
     return pred
 
-def match_two_images_roma(api, img_rgb_path, img_ir_path, max_inliers=800):
+def match_two_images_roma(api, img_rgb_in, img_ir_in, max_inliers=800):
     """
     Match a single RGB-IR pair using MatchAnything ROMA.
-    Returns: mkpts_rgb, mkpts_ir, mconf, rgb_gray, ir_gray
+    Args:
+        img_rgb_in: Path (str/Path) OR Numpy Array (BGR)
+        img_ir_in:  Path (str/Path) OR Numpy Array (BGR)
     """
-    # Load RGB & IR (as color for ROMA)
-    img_rgb = cv2.imread(str(img_rgb_path))  # BGR
-    img_ir = cv2.imread(str(img_ir_path))    # BGR or grayscale, treated as color
+    # --- Helper to handle Path vs Array ---
+    def load_image(img_input):
+        if isinstance(img_input, (str, Path)):
+            img = cv2.imread(str(img_input))
+            if img is None:
+                raise FileNotFoundError(f"Could not read image at {img_input}")
+            return img
+        elif isinstance(img_input, np.ndarray):
+            return img_input
+        else:
+            raise TypeError(f"Input must be a Path or Numpy Array, got {type(img_input)}")
 
-    if img_rgb is None:
-        raise FileNotFoundError(f"Could not read RGB image at {img_rgb_path}")
-    if img_ir is None:
-        raise FileNotFoundError(f"Could not read IR image at {img_ir_path}")
+    # 1. Load Images (Handles both Paths and Arrays)
+    img_rgb = load_image(img_rgb_in)
+    img_ir = load_image(img_ir_in)
 
-    # Convert BGR->RGB because MatchAnything expects RGB
-    img_rgb_rgb = img_rgb[:, :, ::1][:, :, ::-1]
-    img_ir_rgb = img_ir[:, :, ::1][:, :, ::-1]
+    # 2. Ensure they are 3-channel BGR (ROMA expects 3 channels)
+    if img_rgb.ndim == 2:
+        img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_GRAY2BGR)
+    if img_ir.ndim == 2:
+        img_ir = cv2.cvtColor(img_ir, cv2.COLOR_GRAY2BGR)
 
-    # Run ROMA
+    # 3. Convert BGR -> RGB for Model
+    img_rgb_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2RGB)
+    img_ir_rgb = cv2.cvtColor(img_ir, cv2.COLOR_BGR2RGB)
+
+    # 4. Run ROMA
     pred = api(img_rgb_rgb, img_ir_rgb)
 
-    # Use inliers if available
+    # 5. Process Inliers
     if "mmkeypoints0_orig" in pred:
-        print("Using inlier keypoints (mmkeypoints*_orig).")
+        print("[ROMA] Using robust inliers.")
         pred = limit_inliers(pred, max_inliers=max_inliers)
         mkpts_rgb = pred["mmkeypoints0_orig"]
         mkpts_ir = pred["mmkeypoints1_orig"]
         mconf = pred["mmconf"]
     else:
-        print("Using raw keypoints (keypoints0/1).")
+        print("[ROMA] Using raw keypoints.")
         mkpts_rgb = pred["keypoints0"]
         mkpts_ir = pred["keypoints1"]
         mconf = pred.get("confidence")
 
-    # Convert to numpy arrays
+    # 6. Format Outputs
     mkpts_rgb = np.asarray(mkpts_rgb, dtype=np.float32)
     mkpts_ir = np.asarray(mkpts_ir, dtype=np.float32)
     
@@ -86,15 +101,12 @@ def match_two_images_roma(api, img_rgb_path, img_ir_path, max_inliers=800):
     else:
         mconf = np.ones(len(mkpts_rgb), dtype=np.float32)
 
-    # Make grayscale float32 [0,1] copies for visualization/epipolar
+    # Return normalized grayscale for visualization
     rgb_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
-    if img_ir.ndim == 2:
-        ir_gray = img_ir.astype(np.float32) / 255.0
-    else:
-        ir_gray = cv2.cvtColor(img_ir, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+    ir_gray = cv2.cvtColor(img_ir, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
 
     return mkpts_rgb, mkpts_ir, mconf, rgb_gray, ir_gray
-
+    
 def compute_epipolar_error_sampson(pts0, pts1, F):
     """
     Compute Sampson Error for the Fundamental Matrix.
