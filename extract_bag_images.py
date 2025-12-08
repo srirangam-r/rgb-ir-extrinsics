@@ -133,7 +133,18 @@ def main():
             connections = [x for x in reader.connections if x.topic in target_topics]
             for connection, timestamp, rawdata in reader.messages(connections=connections):
                 msg = reader.deserialize(rawdata, connection.msgtype)
-                t_sec = timestamp / 1e9
+                
+                # Use Header Timestamp if available
+                if hasattr(msg, 'header') and hasattr(msg.header, 'stamp'):
+                    t_sec = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
+                else:
+                    t_sec = timestamp / 1e9
+
+                
+                # Apply time offset if specified
+                offset = topics_config.get(connection.topic, {}).get('time_offset', 0.0)
+                t_sec += offset
+                
                 msgs_by_topic[connection.topic].append((t_sec, msg))
                 
             # Sort
@@ -158,6 +169,18 @@ def main():
                         break
                         
                     nearby = [m for m in candidates if abs(m[0] - ref_time) <= time_tol]
+                    
+                    # # DEBUG PRINTS
+                    # if count < 5: # Only print for first few frames
+                    #     print(f"DEBUG: Ref Topic: {ref_topic}, Time: {ref_time:.6f}")
+                    #     print(f"DEBUG: Cand Topic: {other_topic}")
+                    #     if candidates:
+                    #         # Find closest candidate for debug info
+                    #         closest = min(candidates, key=lambda x: abs(x[0] - ref_time))
+                    #         diff = closest[0] - ref_time
+                    #         print(f"DEBUG: Closest candidate diff: {diff:.6f} s (Tol: {time_tol})")
+                    #     else:
+                    #         print("DEBUG: No candidates found for this topic")
                     
                     if not nearby:
                         match_found = False
@@ -213,9 +236,16 @@ def main():
                         opts = topics_config.get(connection.topic, {})
                         cv_img = process_image(cv_img, opts)
                         
-                        fname = f"{count}.png"
-                        save_path = os.path.join(topic_dirs[connection.topic], fname)
-                        cv2.imwrite(save_path, cv_img)
+                        # Save image
+                        # Use timestamp as filename for debugging
+                        if hasattr(msg, 'header') and hasattr(msg.header, 'stamp'):
+                            t_curr = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
+                        else:
+                            t_curr = timestamp / 1e9
+                            
+                        fname = f"{t_curr:.6f}.png"
+                        out_path = os.path.join(topic_dirs[connection.topic], fname)
+                        cv2.imwrite(out_path, cv_img)
                         saved_count += 1
                     
                     if count % 50 == 0:

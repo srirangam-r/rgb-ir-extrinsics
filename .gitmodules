@@ -1,6 +1,6 @@
 [submodule "MatchAnything"]
 	path = MatchAnything
 	url = https://huggingface.co/spaces/LittleFrog/MatchAnything
-[submodule "Depth-Anything-3"]
-	path = Depth-Anything-3
-	url = https://github.com/srirangam-r/Depth-Anything-3
+[submodule "RAFT-Stereo"]
+	path = RAFT-Stereo
+	url = https://github.com/princeton-vl/RAFT-Stereo.git
